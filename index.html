@@ -571,7 +571,7 @@ footer{
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   font-style:normal;
 }
-.footer-copy{font-size:0.75rem;color:var(--dim)}
+.footer-copy{font-size:0.75rem;color:rgba(255,255,255,0.3)}
 
 /* MODAL */
 .modal-overlay{
@@ -745,7 +745,7 @@ footer{
         Available for Projects
       </div>
       <h1 class="hero-title">
-        <span class="name-solid">METHINY</span>
+        <span class="name-solid">METHINY.</span>
       </h1>
       <p class="hero-sub">
         <strong>Bring Anything to Life</strong> — Motion Design, Video Editing &amp; Visual Storytelling.
@@ -922,17 +922,56 @@ footer{
 </div>
 
 <script>
-// ─────────────────────────────────────────────
-// CHANGE THIS PASSWORD TO YOUR OWN SECRET WORD
-const ADMIN_PASSWORD = 'x9x52x26meth';
-// ─────────────────────────────────────────────
+// ── CONFIG — change password here ──
+const GH_TOKEN='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';
+const GH_REPO='methiny/methiny.github.io';
+const GH_FILE='data.json';
+const ADMIN_PASSWORD='methiny2025';
 
-const KEYS={photos:'mthy_photos',videos:'mthy_videos',motion:'mthy_motion',certs:'mthy_certs',bio:'mthy_bio',stats:'mthy_stats',profile:'mthy_profile'};
 let adminUnlocked=false;
-let pendingAction=null;
+let ghFileSha=null;
+let portfolioData={photos:[],videos:[],motion:[],certs:[],bio:'',stats:{},profile:''};
 
-function load(k){try{return JSON.parse(localStorage.getItem(k)||'null')}catch{return null}}
-function save(k,v){localStorage.setItem(k,JSON.stringify(v))}
+// ── GITHUB API ──
+async function ghGet(){
+  try{
+    const r=await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${GH_FILE}`,{
+      headers:{'Authorization':`token ${GH_TOKEN}`,'Accept':'application/vnd.github.v3+json'}
+    });
+    if(r.status===404){return null;}
+    const j=await r.json();
+    ghFileSha=j.sha;
+    return JSON.parse(atob(j.content.replace(/\n/g,'')));
+  }catch(e){console.error('GH read error',e);return null;}
+}
+
+async function ghSave(data){
+  const content=btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2))));
+  const body={message:'Portfolio update',content};
+  if(ghFileSha)body.sha=ghFileSha;
+  try{
+    const r=await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${GH_FILE}`,{
+      method:'PUT',
+      headers:{'Authorization':`token ${GH_TOKEN}`,'Content-Type':'application/json'},
+      body:JSON.stringify(body)
+    });
+    const j=await r.json();
+    if(j.content)ghFileSha=j.content.sha;
+    return r.ok;
+  }catch(e){console.error('GH save error',e);return false;}
+}
+
+function showSaving(msg='Saving...'){
+  let el=document.getElementById('save-toast');
+  if(!el){el=document.createElement('div');el.id='save-toast';el.style.cssText='position:fixed;bottom:5rem;right:2rem;z-index:400;padding:0.6rem 1.2rem;background:var(--purple);color:#fff;font-family:Montserrat,sans-serif;font-size:0.78rem;font-weight:700;border-radius:50px;letter-spacing:0.06em;transition:opacity 0.4s;';document.body.appendChild(el);}
+  el.textContent=msg;el.style.opacity='1';
+}
+function hideSaving(msg='✓ Saved!'){
+  const el=document.getElementById('save-toast');
+  if(!el)return;
+  el.textContent=msg;
+  setTimeout(()=>{el.style.opacity='0';},1800);
+}
 
 // ── AUTH ──
 function toggleAdmin(){
@@ -952,51 +991,64 @@ function checkPw(){
     document.getElementById('pw-error').style.display='none';
     document.getElementById('admin-menu').classList.add('open');
     document.getElementById('admin-toggle-btn').style.background='var(--purple)';
-    if(pendingAction){openModal(pendingAction);pendingAction=null;}
+    // show add buttons now that admin is unlocked
+    renderAll();
   } else {
     document.getElementById('pw-error').style.display='block';
     document.getElementById('pw-input').value='';
   }
 }
-function adminAction(type){
-  if(!adminUnlocked){pendingAction=type;document.getElementById('pw-screen').style.display='flex';setTimeout(()=>document.getElementById('pw-input').focus(),100);return;}
-  openModal(type);
-}
+function adminAction(type){openModal(type);}
 
 // ── RENDER ALL ──
-function renderAll(){renderPhotos();renderVideos();renderMotion();renderCerts();renderBio();renderStats();renderProfile();}
+function renderAll(){
+  renderPhotos();renderVideos();renderMotion();
+  renderCerts();renderBio();renderStats();renderProfile();
+}
 
 // ── PHOTOS ──
 function renderPhotos(){
-  const photos=load(KEYS.photos)||[];
+  const photos=portfolioData.photos||[];
   const g=document.getElementById('photo-grid');g.innerHTML='';
   photos.forEach((p,i)=>{
     const d=document.createElement('div');d.className='gallery-card';
-    d.innerHTML=`<img src="${p.url}" alt="${p.title}" onerror="this.style.display='none'"/><div class="gallery-overlay"><div class="g-title">${p.title}</div><div class="g-tag">${p.tag||'Photography'}</div></div><button class="del-x" onclick="event.stopPropagation();delItem('photos',${i})">✕</button>`;
-    d.addEventListener('mouseenter',()=>d.querySelector('.del-x').style.display='flex');
-    d.addEventListener('mouseleave',()=>d.querySelector('.del-x').style.display='none');
+    d.innerHTML=`<img src="${p.url}" alt="${p.title}" onerror="this.style.display='none'"/><div class="gallery-overlay"><div class="g-title">${p.title}</div><div class="g-tag">${p.tag||'Photography'}</div></div>${adminUnlocked?`<button class="del-x" onclick="event.stopPropagation();delItem('photos',${i})">✕</button>`:''}`;
+    if(adminUnlocked){
+      d.addEventListener('mouseenter',()=>d.querySelector('.del-x').style.display='flex');
+      d.addEventListener('mouseleave',()=>d.querySelector('.del-x').style.display='none');
+    }
     g.appendChild(d);
   });
-  const a=document.createElement('div');a.className='add-btn';a.innerHTML='<div class="add-plus">+</div>Add Photo';a.onclick=()=>adminAction('photo');g.appendChild(a);
+  if(adminUnlocked){
+    const a=document.createElement('div');a.className='add-btn';
+    a.innerHTML='<div class="add-plus">+</div>Add Photo';
+    a.onclick=()=>openModal('photo');g.appendChild(a);
+  }
 }
 
 // ── VIDEOS ──
 function ytId(u){const m=u.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([^&\n?#]+)/);return m?m[1]:null}
 function viId(u){const m=u.match(/vimeo\.com\/(\d+)/);return m?m[1]:null}
 function renderVideos(){
-  const vids=load(KEYS.videos)||[];
+  const vids=portfolioData.videos||[];
   const g=document.getElementById('video-grid');g.innerHTML='';
   vids.forEach((v,i)=>{
     const yid=ytId(v.url),vid2=viId(v.url);
     const thumb=yid?`https://img.youtube.com/vi/${yid}/hqdefault.jpg`:'';
     const embed=yid?`https://www.youtube.com/embed/${yid}?autoplay=1`:vid2?`https://player.vimeo.com/video/${vid2}?autoplay=1`:v.url;
     const d=document.createElement('div');d.className='video-card';
-    d.innerHTML=`<div class="video-thumb" onclick="playEmbed('${embed}')"><img src="${thumb}" alt="${v.title}" onerror="this.style.display='none'"/><div class="play-circle"><svg width="18" height="18" fill="white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div><div class="video-info"><div class="video-title">${v.title}</div><div class="video-meta">${v.category||'Video'}${v.year?' · '+v.year:''}</div></div><button class="del-x" onclick="event.stopPropagation();delItem('videos',${i})">✕</button>`;
-    d.addEventListener('mouseenter',()=>d.querySelector('.del-x').style.display='flex');
-    d.addEventListener('mouseleave',()=>d.querySelector('.del-x').style.display='none');
+    d.innerHTML=`<div class="video-thumb" onclick="playEmbed('${embed}')"><img src="${thumb}" alt="${v.title}" onerror="this.style.display='none'"/><div class="play-circle"><svg width="18" height="18" fill="white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div></div><div class="video-info"><div class="video-title">${v.title}</div><div class="video-meta">${v.category||'Video'}${v.year?' · '+v.year:''}</div></div>${adminUnlocked?`<button class="del-x" onclick="event.stopPropagation();delItem('videos',${i})">✕</button>`:''}`;
+    if(adminUnlocked){
+      d.addEventListener('mouseenter',()=>d.querySelector('.del-x').style.display='flex');
+      d.addEventListener('mouseleave',()=>d.querySelector('.del-x').style.display='none');
+    }
     g.appendChild(d);
   });
-  const a=document.createElement('div');a.className='add-btn add-btn-video';a.innerHTML='<div class="add-plus">+</div>Add Video';a.onclick=()=>adminAction('video');g.appendChild(a);
+  if(adminUnlocked){
+    const a=document.createElement('div');a.className='add-btn add-btn-video';
+    a.innerHTML='<div class="add-plus">+</div>Add Video';
+    a.onclick=()=>openModal('video');g.appendChild(a);
+  }
 }
 function playEmbed(url){
   document.getElementById('modal-title').textContent='';
@@ -1006,37 +1058,64 @@ function playEmbed(url){
 
 // ── MOTION ──
 function renderMotion(){
-  const items=load(KEYS.motion)||[];
+  const items=portfolioData.motion||[];
   const g=document.getElementById('motion-grid');g.innerHTML='';
   items.forEach((m,i)=>{
+    const yid=m.videoUrl?ytId(m.videoUrl):null;
+    const vid2=m.videoUrl?viId(m.videoUrl):null;
+    const embed=yid?`https://www.youtube.com/embed/${yid}?autoplay=1`:vid2?`https://player.vimeo.com/video/${vid2}?autoplay=1`:m.videoUrl||'';
+    const clickable=!!embed;
     const d=document.createElement('div');d.className='motion-card';
-    d.innerHTML=`<div class="motion-banner">${m.imageUrl?`<img src="${m.imageUrl}" alt="${m.title}"/>`:'<svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="rgba(123,47,255,0.3)" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 01-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75.125v-5.625A2.25 2.25 0 014.5 10.5h15a2.25 2.25 0 012.25 2.25v5.625"/></svg>'}</div><span class="motion-tool-badge">${m.tool||'AE'}</span><div class="motion-info"><div class="motion-title">${m.title}</div><div class="motion-desc">${m.desc||''}</div></div><button class="del-x" onclick="event.stopPropagation();delItem('motion',${i})">✕</button>`;
-    d.addEventListener('mouseenter',()=>d.querySelector('.del-x').style.display='flex');
-    d.addEventListener('mouseleave',()=>d.querySelector('.del-x').style.display='none');
+    if(clickable)d.style.cursor='pointer';
+    d.innerHTML=`
+      <div class="motion-banner" ${clickable?`onclick="playEmbed('${embed}')"`:''}">
+        ${m.imageUrl?`<img src="${m.imageUrl}" alt="${m.title}"/>`:'<svg width="36" height="36" fill="none" viewBox="0 0 24 24" stroke="rgba(155,95,255,0.3)" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15.91 11.672a.375.375 0 010 .656l-5.603 3.113a.375.375 0 01-.557-.328V8.887c0-.286.307-.466.557-.327l5.603 3.112z"/></svg>'}
+        ${clickable?'<div class="play-circle" style="position:absolute"><svg width="18" height="18" fill="white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>':''}
+      </div>
+      <span class="motion-tool-badge">${m.tool||'AE'}</span>
+      <div class="motion-info"><div class="motion-title">${m.title}</div><div class="motion-desc">${m.desc||''}</div></div>
+      ${adminUnlocked?`<button class="del-x" onclick="event.stopPropagation();delItem('motion',${i})">✕</button>`:''}`;
+    if(adminUnlocked){
+      d.addEventListener('mouseenter',()=>d.querySelector('.del-x').style.display='flex');
+      d.addEventListener('mouseleave',()=>d.querySelector('.del-x').style.display='none');
+    }
     g.appendChild(d);
   });
-  const a=document.createElement('div');a.className='add-btn';a.style.aspectRatio='16/9';a.innerHTML='<div class="add-plus">+</div>Add Project';a.onclick=()=>adminAction('motion');g.appendChild(a);
+  if(adminUnlocked){
+    const a=document.createElement('div');a.className='add-btn';a.style.aspectRatio='16/9';
+    a.innerHTML='<div class="add-plus">+</div>Add Project';
+    a.onclick=()=>openModal('motion');g.appendChild(a);
+  }
 }
 
 // ── CERTS ──
 function renderCerts(){
-  const certs=load(KEYS.certs)||[];
+  const certs=portfolioData.certs||[];
   const g=document.getElementById('certs-grid');g.innerHTML='';
   certs.forEach((c,i)=>{
     const d=document.createElement('div');d.className='cert-card';
-    d.innerHTML=`<div class="cert-ico">${c.icon||'🏆'}</div><div><div class="cert-name">${c.name}</div><div class="cert-issuer">${c.issuer||''}</div><div class="cert-year">${c.year||''}</div></div><button class="del-x" onclick="event.stopPropagation();delItem('certs',${i})">✕</button>`;
-    d.addEventListener('mouseenter',()=>d.querySelector('.del-x').style.display='flex');
-    d.addEventListener('mouseleave',()=>d.querySelector('.del-x').style.display='none');
+    d.innerHTML=`<div class="cert-ico">${c.icon||'🏆'}</div><div><div class="cert-name">${c.name}</div><div class="cert-issuer">${c.issuer||''}</div><div class="cert-year">${c.year||''}</div></div>${adminUnlocked?`<button class="del-x" onclick="event.stopPropagation();delItem('certs',${i})">✕</button>`:''}`;
+    if(adminUnlocked){
+      d.addEventListener('mouseenter',()=>d.querySelector('.del-x').style.display='flex');
+      d.addEventListener('mouseleave',()=>d.querySelector('.del-x').style.display='none');
+    }
     g.appendChild(d);
   });
-  const a=document.createElement('button');a.className='cert-add-btn';a.innerHTML='<span style="font-size:1.4rem">+</span>Add Certification';a.onclick=()=>adminAction('cert');g.appendChild(a);
+  if(adminUnlocked){
+    const a=document.createElement('button');a.className='cert-add-btn';
+    a.innerHTML='<span style="font-size:1.4rem">+</span>Add Certification';
+    a.onclick=()=>openModal('cert');g.appendChild(a);
+  }
   document.getElementById('stat-certs').textContent=certs.length||'0';
 }
 
 // ── BIO & STATS ──
-function renderBio(){const b=load(KEYS.bio);if(b)document.getElementById('about-bio-text').innerHTML=b;}
+function renderBio(){
+  const b=portfolioData.bio;
+  if(b)document.getElementById('about-bio-text').innerHTML=b;
+}
 function renderStats(){
-  const s=load(KEYS.stats)||{};
+  const s=portfolioData.stats||{};
   if(s.projects)document.getElementById('stat-projects').textContent=s.projects+'+';
   if(s.years)document.getElementById('stat-years').textContent=s.years;
   if(s.clients)document.getElementById('stat-clients').textContent=s.clients+'+';
@@ -1044,7 +1123,7 @@ function renderStats(){
 
 // ── PROFILE PHOTO ──
 function renderProfile(){
-  const src=load(KEYS.profile);if(!src)return;
+  const src=portfolioData.profile;if(!src)return;
   const hs=document.getElementById('hero-photo-slot');
   hs.innerHTML=`<img src="${src}" style="width:100%;height:100%;object-fit:cover;border-radius:0" alt="Methiny"/>`;
   hs.style.border='none';hs.style.background='none';
@@ -1055,11 +1134,14 @@ function renderProfile(){
 }
 
 // ── DELETE ──
-function delItem(type,i){
-  if(!adminUnlocked){alert('Please unlock admin first.');return;}
-  const map={photos:KEYS.photos,videos:KEYS.videos,motion:KEYS.motion,certs:KEYS.certs};
+async function delItem(type,i){
   if(!confirm('Remove this item?'))return;
-  const arr=load(map[type])||[];arr.splice(i,1);save(map[type],arr);renderAll();
+  if(!Array.isArray(portfolioData[type]))return;
+  portfolioData[type].splice(i,1);
+  renderAll();
+  showSaving('Deleting...');
+  const ok=await ghSave(portfolioData);
+  hideSaving(ok?'✓ Deleted!':'⚠ Save failed — check token');
 }
 
 // ── MODAL ──
@@ -1069,7 +1151,7 @@ function openModal(type){
   const forms={
     photo:{t:'Add Photo',h:`
       <div class="form-group"><label class="form-label">Title</label><input class="form-input" id="f-title" placeholder="e.g. Brand Campaign 2024"/></div>
-      <div class="form-group"><label class="form-label">Image URL</label><input class="form-input" id="f-url" placeholder="https://i.imgur.com/..."/><div class="form-note">Tip: upload to <a href="https://imgur.com" target="_blank" style="color:var(--purple)">imgur.com</a> for free, then paste the direct link here.</div></div>
+      <div class="form-group"><label class="form-label">Image URL</label><input class="form-input" id="f-url" placeholder="https://i.imgur.com/..."/><div class="form-note">Upload to <a href="https://imgur.com" target="_blank" style="color:var(--purple)">imgur.com</a> free, then paste the direct image link here.</div></div>
       <div class="form-group"><label class="form-label">Category Tag</label><input class="form-input" id="f-tag" placeholder="e.g. Branding, Design, Photo"/></div>
       <button class="form-submit" onclick="submitPhoto()">Add Photo</button>`},
     video:{t:'Add Video',h:`
@@ -1082,7 +1164,8 @@ function openModal(type){
       <div class="form-group"><label class="form-label">Project Title</label><input class="form-input" id="f-title" placeholder="e.g. Logo Animation Pack"/></div>
       <div class="form-group"><label class="form-label">Description</label><textarea class="form-textarea" id="f-desc" placeholder="Short project description..."></textarea></div>
       <div class="form-group"><label class="form-label">Tool Used</label><select class="form-select" id="f-tool"><option>After Effects</option><option>Blender</option><option>After Effects + Blender</option><option>DaVinci Resolve</option><option>Illustrator + AE</option></select></div>
-      <div class="form-group"><label class="form-label">Cover Image URL (optional)</label><input class="form-input" id="f-img" placeholder="https://..."/></div>
+      <div class="form-group"><label class="form-label">Video URL (YouTube/Vimeo — optional)</label><input class="form-input" id="f-vid" placeholder="https://youtube.com/watch?v=..."/><div class="form-note">If added, clicking the card will play the video in a popup.</div></div>
+      <div class="form-group"><label class="form-label">Cover Image URL (optional)</label><input class="form-input" id="f-img" placeholder="https://i.imgur.com/..."/></div>
       <button class="form-submit" onclick="submitMotion()">Add Project</button>`},
     cert:{t:'Add Certification',h:`
       <div class="form-group"><label class="form-label">Certification Name</label><input class="form-input" id="f-name" placeholder="e.g. Adobe Certified Professional"/></div>
@@ -1091,12 +1174,12 @@ function openModal(type){
       <div class="form-group"><label class="form-label">Icon Emoji</label><input class="form-input" id="f-icon" placeholder="🏆" maxlength="2"/></div>
       <button class="form-submit" onclick="submitCert()">Add Certification</button>`},
     bio:{t:'Edit Your Bio',h:`
-      <div class="form-group"><label class="form-label">About Me Text</label><textarea class="form-textarea" id="f-bio" style="min-height:140px">${load(KEYS.bio)||document.getElementById('about-bio-text').innerHTML}</textarea><div class="form-note">You can use &lt;strong&gt;bold&lt;/strong&gt; for emphasis.</div></div>
+      <div class="form-group"><label class="form-label">About Me Text</label><textarea class="form-textarea" id="f-bio" style="min-height:140px">${portfolioData.bio||document.getElementById('about-bio-text').innerHTML}</textarea><div class="form-note">You can use &lt;strong&gt;bold&lt;/strong&gt; for emphasis.</div></div>
       <button class="form-submit" onclick="submitBio()">Save Bio</button>`},
     stats:{t:'Edit Stats',h:`
-      <div class="form-group"><label class="form-label">Projects Completed (number only)</label><input class="form-input" id="f-projects" placeholder="e.g. 50" value="${(load(KEYS.stats)||{}).projects||''}"/></div>
-      <div class="form-group"><label class="form-label">Years of Experience</label><input class="form-input" id="f-years" placeholder="e.g. 3" value="${(load(KEYS.stats)||{}).years||''}"/></div>
-      <div class="form-group"><label class="form-label">Clients Worked With (number only)</label><input class="form-input" id="f-clients" placeholder="e.g. 20" value="${(load(KEYS.stats)||{}).clients||''}"/></div>
+      <div class="form-group"><label class="form-label">Projects Completed</label><input class="form-input" id="f-projects" placeholder="e.g. 50" value="${(portfolioData.stats||{}).projects||''}"/></div>
+      <div class="form-group"><label class="form-label">Years of Experience</label><input class="form-input" id="f-years" placeholder="e.g. 3" value="${(portfolioData.stats||{}).years||''}"/></div>
+      <div class="form-group"><label class="form-label">Clients Worked With</label><input class="form-input" id="f-clients" placeholder="e.g. 20" value="${(portfolioData.stats||{}).clients||''}"/></div>
       <button class="form-submit" onclick="submitStats()">Save Stats</button>`},
     'photo-profile':{t:'Update Profile Photo',h:`
       <div class="form-group"><label class="form-label">Option 1 — Paste Image URL</label><input class="form-input" id="f-purl" placeholder="https://i.imgur.com/yourphoto.jpg"/><div class="form-note">Upload your photo to <a href="https://imgur.com" target="_blank" style="color:var(--purple)">imgur.com</a> (free), right-click the image → "Copy image address", paste here.</div></div>
@@ -1113,61 +1196,93 @@ function closeModal(){document.getElementById('modal-overlay').classList.remove(
 function closeModalOnBg(e){if(e.target===document.getElementById('modal-overlay'))closeModal()}
 
 // ── SUBMITS ──
-function submitPhoto(){
+async function submitPhoto(){
   const t=document.getElementById('f-title').value.trim();
   const u=document.getElementById('f-url').value.trim();
   const tg=document.getElementById('f-tag').value.trim();
   if(!t||!u){alert('Title and Image URL are required.');return;}
-  const a=load(KEYS.photos)||[];a.push({title:t,url:u,tag:tg});save(KEYS.photos,a);closeModal();renderPhotos();
+  portfolioData.photos.push({title:t,url:u,tag:tg});
+  closeModal();renderPhotos();
+  showSaving();const ok=await ghSave(portfolioData);hideSaving(ok?'✓ Photo saved!':'⚠ Save failed');
 }
-function submitVideo(){
+async function submitVideo(){
   const t=document.getElementById('f-title').value.trim();
   const u=document.getElementById('f-url').value.trim();
   const c=document.getElementById('f-cat').value.trim();
   const y=document.getElementById('f-year').value.trim();
   if(!t||!u){alert('Title and URL are required.');return;}
-  const a=load(KEYS.videos)||[];a.push({title:t,url:u,category:c,year:y});save(KEYS.videos,a);closeModal();renderVideos();
+  portfolioData.videos.push({title:t,url:u,category:c,year:y});
+  closeModal();renderVideos();
+  showSaving();const ok=await ghSave(portfolioData);hideSaving(ok?'✓ Video saved!':'⚠ Save failed');
 }
-function submitMotion(){
+async function submitMotion(){
   const t=document.getElementById('f-title').value.trim();
   const d=document.getElementById('f-desc').value.trim();
   const tool=document.getElementById('f-tool').value;
   const img=document.getElementById('f-img').value.trim();
+  const vid=document.getElementById('f-vid').value.trim();
   if(!t){alert('Project title is required.');return;}
-  const a=load(KEYS.motion)||[];a.push({title:t,desc:d,tool,imageUrl:img});save(KEYS.motion,a);closeModal();renderMotion();
+  portfolioData.motion.push({title:t,desc:d,tool,imageUrl:img,videoUrl:vid});
+  closeModal();renderMotion();
+  showSaving();const ok=await ghSave(portfolioData);hideSaving(ok?'✓ Project saved!':'⚠ Save failed');
 }
-function submitCert(){
+async function submitCert(){
   const n=document.getElementById('f-name').value.trim();
   const iss=document.getElementById('f-issuer').value.trim();
   const y=document.getElementById('f-year').value.trim();
   const ico=document.getElementById('f-icon').value.trim()||'🏆';
   if(!n){alert('Certification name is required.');return;}
-  const a=load(KEYS.certs)||[];a.push({name:n,issuer:iss,year:y,icon:ico});save(KEYS.certs,a);closeModal();renderCerts();
+  portfolioData.certs.push({name:n,issuer:iss,year:y,icon:ico});
+  closeModal();renderCerts();
+  showSaving();const ok=await ghSave(portfolioData);hideSaving(ok?'✓ Cert saved!':'⚠ Save failed');
 }
-function submitBio(){const b=document.getElementById('f-bio').value;save(KEYS.bio,b);closeModal();renderBio();}
-function submitStats(){const p=document.getElementById('f-projects').value.trim();const y=document.getElementById('f-years').value.trim();const c=document.getElementById('f-clients').value.trim();save(KEYS.stats,{projects:p,years:y,clients:c});closeModal();renderStats();}
+async function submitBio(){
+  portfolioData.bio=document.getElementById('f-bio').value;
+  closeModal();renderBio();
+  showSaving();const ok=await ghSave(portfolioData);hideSaving(ok?'✓ Bio saved!':'⚠ Save failed');
+}
+async function submitStats(){
+  portfolioData.stats={
+    projects:document.getElementById('f-projects').value.trim(),
+    years:document.getElementById('f-years').value.trim(),
+    clients:document.getElementById('f-clients').value.trim()
+  };
+  closeModal();renderStats();
+  showSaving();const ok=await ghSave(portfolioData);hideSaving(ok?'✓ Stats saved!':'⚠ Save failed');
+}
 function prevPhoto(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
   r.onload=ev=>{document.getElementById('prev-img').src=ev.target.result;document.getElementById('prev-wrap').style.display='block'};
   r.readAsDataURL(f);
 }
-function submitProfile(){
+async function submitProfile(){
   const u=document.getElementById('f-purl').value.trim();
   const fi=document.getElementById('f-pfile');
-  if(u){save(KEYS.profile,u);closeModal();renderProfile();}
-  else if(fi.files[0]){
+  if(u){
+    portfolioData.profile=u;closeModal();renderProfile();
+    showSaving();const ok=await ghSave(portfolioData);hideSaving(ok?'✓ Photo saved!':'⚠ Save failed');
+  } else if(fi.files[0]){
     const r=new FileReader();
-    r.onload=ev=>{save(KEYS.profile,ev.target.result);closeModal();renderProfile();};
+    r.onload=async ev=>{
+      portfolioData.profile=ev.target.result;closeModal();renderProfile();
+      showSaving();const ok=await ghSave(portfolioData);hideSaving(ok?'✓ Photo saved!':'⚠ Save failed');
+    };
     r.readAsDataURL(fi.files[0]);
   } else {alert('Please enter a URL or select a file.');}
 }
 
-// ── INIT ──
-renderAll();
-
-const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible')})},{threshold:0.1});
-document.querySelectorAll('.fade-up').forEach(el=>obs.observe(el));
+// ── INIT — load from GitHub first ──
+(async()=>{
+  showSaving('Loading portfolio...');
+  const data=await ghGet();
+  if(data){portfolioData=data;}
+  hideSaving('');
+  renderAll();
+  // run observer after content loads
+  const obs=new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting)e.target.classList.add('visible')})},{threshold:0.1});
+  document.querySelectorAll('.fade-up').forEach(el=>obs.observe(el));
+})();
 
 // ── STARFIELD ──
 (function(){
