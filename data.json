@@ -17,7 +17,14 @@
       "videoUrl": "https://youtube.com/shorts/zDd_x1pVIoE?si=SdAONYr8-PBF3nGa"
     }
   ],
-  "certs": [],
+  "certs": [
+    {
+      "name": "AWS Cloud Foundation Certificate",
+      "issuer": "AWS",
+      "year": "2026",
+      "icon": "🫆"
+    }
+  ],
   "bio": "",
   "stats": {
     "projects": "100+",
