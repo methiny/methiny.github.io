@@ -1,6 +1,13 @@
 {
   "photos": [],
-  "videos": [],
+  "videos": [
+    {
+      "title": "neWwave - Leads Radar",
+      "url": "https://youtube.com/shorts/zDd_x1pVIoE?si=SdAONYr8-PBF3nGa",
+      "category": "Commercial",
+      "year": "2026"
+    }
+  ],
   "motion": [],
   "certs": [],
   "bio": "",
