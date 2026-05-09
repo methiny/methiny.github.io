@@ -8,7 +8,15 @@
       "year": "2026"
     }
   ],
-  "motion": [],
+  "motion": [
+    {
+      "title": "neWwave - Leads Radar",
+      "desc": "",
+      "tool": "After Effects",
+      "imageUrl": "",
+      "videoUrl": "https://youtube.com/shorts/zDd_x1pVIoE?si=SdAONYr8-PBF3nGa"
+    }
+  ],
   "certs": [
     {
       "name": "AWS Cloud Foundation Certificate",
