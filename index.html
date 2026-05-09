@@ -571,7 +571,7 @@ footer{
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;
   font-style:normal;
 }
-.footer-copy{font-size:0.75rem;color:var(--dim)}
+.footer-copy{font-size:0.75rem;color:rgba(255,255,255,0.3)}
 
 /* MODAL */
 .modal-overlay{
@@ -745,7 +745,7 @@ footer{
         Available for Projects
       </div>
       <h1 class="hero-title">
-        <span class="name-solid">METHINY</span>
+        <span class="name-solid">METHINY.</span>
       </h1>
       <p class="hero-sub">
         <strong>Bring Anything to Life</strong> — Motion Design, Video Editing &amp; Visual Storytelling.
@@ -947,6 +947,21 @@ async function ghGet(){
 }
 
 async function ghSave(data){
+  // always fetch the latest SHA before saving to prevent overwriting other changes
+  try{
+    const check=await fetch(`https://api.github.com/repos/${GH_REPO}/contents/${GH_FILE}`,{
+      headers:{'Authorization':`token ${GH_TOKEN}`,'Accept':'application/vnd.github.v3+json'}
+    });
+    if(check.ok){
+      const latest=await check.json();
+      ghFileSha=latest.sha;
+      // merge: use latest file as base, apply only our specific change on top
+      const latestData=JSON.parse(atob(latest.content.replace(/\n/g,'')));
+      // preserve all fields from latest, overwrite with our updated data
+      data=Object.assign({},latestData,data);
+    }
+  }catch(e){console.warn('Pre-save fetch failed, using cached SHA');}
+
   const content=btoa(unescape(encodeURIComponent(JSON.stringify(data,null,2))));
   const body={message:'Portfolio update',content};
   if(ghFileSha)body.sha=ghFileSha;
@@ -957,7 +972,8 @@ async function ghSave(data){
       body:JSON.stringify(body)
     });
     const j=await r.json();
-    if(j.content)ghFileSha=j.content.sha;
+    if(j.content){ghFileSha=j.content.sha;}
+    if(r.ok){portfolioData=data;}// keep local state in sync
     return r.ok;
   }catch(e){console.error('GH save error',e);return false;}
 }
