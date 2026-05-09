@@ -9,7 +9,14 @@
     }
   ],
   "motion": [],
-  "certs": [],
+  "certs": [
+    {
+      "name": "AWS Cloud Foundation Certificate",
+      "issuer": "AWS",
+      "year": "2026",
+      "icon": "🏆"
+    }
+  ],
   "bio": "",
   "stats": {
     "projects": "100+",
